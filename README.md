@@ -6,14 +6,14 @@
 
 ---
 
-[<img src="https://www.getmangos.eu/!assets_mangos/Mangos3.png" width="48" valign="middle"/>][8]
- **MangosThree - The Cataclysm WoW Database**
+[<img src="https://www.getmangos.eu/!assets_mangos/Mangos4.png" width="48" valign="middle"/>][8]
+ **MangosFour - The Mists of Pandaria WoW Database**
 ===
 
-This is the database to support the MangosThree server.
+This is the database to support the MangosFour server.
 
-It aims to be 100% compatible with the final version of CATA [World of Warcraft][2],
-namely [patch 4.3.4][4].
+It aims to be 100% compatible with the final version of Mists of Pandaria [World of Warcraft][2],
+namely Patch 5.4.8.
 
 
 Dependencies
@@ -113,7 +113,6 @@ World of Warcraft, and all related art, images, and lore are copyright [Blizzard
 [1]: http://blizzard.com/ "Blizzard Entertainment Inc. - We love you!"
 [2]: https://worldofwarcraft.com/ "World of Warcraft"
 [3]: https://www.getmangos.eu "Main MaNGOS Website"
-[4]: http://www.wowpedia.org/Patch_4.3.4 "Cataclysm - Patch 4.3.4 release notes"
 [8]: https://github.com/mangos/MaNGOS/blob/master/mangosFamily.md "The MaNGOS family of Icons"
 [9]: https://discord.gg/fPxMjHS8xs "Our community hub on Discord"
 [14]: http://makeapullrequest.com "Show PR's Welcome Icon"
