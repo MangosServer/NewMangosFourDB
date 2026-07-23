@@ -1,8 +1,8 @@
 @ECHO OFF
 
 set scriptVersion=2.3
-set releaseVersionPrevious=21
-set releaseVersionCurrent=22
+set releaseVersionPrevious=23
+set releaseVersionCurrent=23
 
 rem -- Change the values below to match your server --
 rem -- Or do so in InstallDatabasesPreset.bat instead. --

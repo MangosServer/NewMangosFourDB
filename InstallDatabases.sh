@@ -5,8 +5,8 @@
 #                                                                            #
 ##############################################################################
 
-OLDRELEASE="Rel21"
-RELEASE="Rel22"
+OLDRELEASE="Rel23"
+RELEASE="Rel23"
 DUMP="NO"
 
 dbname=""
