@@ -8364,6 +8364,15 @@ INSERT INTO `npc_text` (`ID`, `text0_0`, `text0_1`, `lang0`, `prob0`, `em0_0_del
 (60004,'A trio of ethereal technomancers has set up shop in Orgrimmar, along the eastern Drag.\r\n\r\nLook for the weird machinery and purple lights... you can\'t miss it.\r\n\r\nThey offer just the sort of services you\'re looking for.','A trio of ethereal technomancers has set up shop in Orgrimmar, along the eastern Drag.\r\n\r\nLook for the weird machinery and purple lights... you can\'t miss it.\r\n\r\nThey offer just the sort of services you\'re looking for.',0,1,0,0,0,0,0,0,'','',0,0,0,0,0,0,0,0,'','',0,0,0,0,0,0,0,0,'','',0,0,0,0,0,0,0,0,'','',0,0,0,0,0,0,0,0,'','',0,0,0,0,0,0,0,0,'','',0,0,0,0,0,0,0,0,'','',0,0,0,0,0,0,0,0);
 /*!40000 ALTER TABLE `npc_text` ENABLE KEYS */;
 UNLOCK TABLES;
+
+-- Direct build-18414 BroadcastText.db2 exact and unique match. The remaining
+-- legacy rows stay unmapped rather than receiving speculative identifiers.
+UPDATE `npc_text`
+SET `BroadcastTextID0` = 62792
+WHERE `ID` = 17235
+  AND `text0_0` = 'Who are you?'
+  AND `text0_1` = 'Who are you?';
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
