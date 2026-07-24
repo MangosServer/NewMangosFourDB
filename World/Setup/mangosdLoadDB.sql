@@ -168,6 +168,7 @@ CREATE TABLE `battleground_template` (
   `AllianceStartO` float NOT NULL COMMENT 'The orientation of the alliance players upon teleport.',
   `HordeStartLoc` mediumint(8) unsigned NOT NULL COMMENT 'The location where the horde players get teleported to in the battleground.',
   `HordeStartO` float NOT NULL COMMENT 'The orientation of the horde players upon teleport into the battleground.',
+  `StartMaxDist` float NOT NULL DEFAULT 0,
   `Comment` varchar(255) NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
