@@ -1,7 +1,7 @@
 @ECHO OFF
 
 set scriptVersion=2.3
-set releaseVersionPrevious=23
+set releaseVersionPrevious=22
 set releaseVersionCurrent=23
 
 rem -- Change the values below to match your server --
