@@ -114,8 +114,18 @@ DELETE FROM `instance_reset`;
 -- the tier that got stored belonged to an unrelated dungeon and never described
 -- what the player queued for. There is no intent in these values to preserve;
 -- translating noise would only make it look deliberate. Normal is the safe
--- landing point because every instanceable map has a normal tier, so no
--- character is left holding a difficulty its map cannot offer.
+-- landing point because it is the tier every character already defaults to and
+-- the one the overwhelming majority of instanceable maps offer.
+--
+-- Not ALL of them, which an earlier version of this comment claimed. Eight
+-- maps have no normal tier: the three heroic-only five-mans -- End Time (938),
+-- Well of Eternity (939) and Hour of Twilight (940), each shipping a single
+-- raw-2 row -- and five scenario maps (1024, 1049, 1155, 1157, 1161) that ship
+-- only raw 11/12 and end with no usable tier at all. Those eight are
+-- unenterable at any stored value, before this update and after it, so
+-- clamping neither causes nor cures their problem. The claim is corrected
+-- rather than dropped because it was the stated justification for the clamp,
+-- and the justification that actually holds is the narrower one above.
 --
 -- Safe because the structure gate makes the key space unambiguous. A database
 -- still on structure 01 has only ever been written by cores predating the
