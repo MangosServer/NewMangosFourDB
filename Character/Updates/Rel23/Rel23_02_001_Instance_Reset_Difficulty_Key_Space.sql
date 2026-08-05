@@ -26,9 +26,9 @@ BEGIN
     SET @cNewStructure = '02';
     SET @cNewContent = '001';
                             -- DESCRIPTION IS 30 Characters MAX
-    SET @cNewDescription = 'instance_reset key space';
+    SET @cNewDescription = 'difficulty key spaces';
                         -- COMMENT is 150 Characters MAX
-    SET @cNewComment = 'instance_reset.difficulty now holds the internal 0-based Difficulty instead of the raw client DifficultyID';
+    SET @cNewComment = 'instance_reset.difficulty, characters.dungeon_difficulty and groups.difficulty now hold the internal 0-based Difficulty, not the raw client id';
 
     -- Evaluate all settings
     SET @cCurResult := (SELECT `description` FROM `db_version` ORDER BY `version` DESC, `STRUCTURE` DESC, `CONTENT` DESC LIMIT 0,1);
@@ -73,6 +73,60 @@ BEGIN
 -- ============================================================================
 
 DELETE FROM `instance_reset`;
+
+-- ============================================================================
+-- `characters`.`dungeon_difficulty` and `groups`.`difficulty` change key space
+-- ============================================================================
+-- The same key-space split reaches saved player state, by a different route.
+--
+-- The old dungeon finder wrote a RAW client DifficultyID straight into the
+-- internal enum:
+--
+--     LFGMgr::CreateDungeonGroup
+--         pGroup->SetDungeonDifficulty(Difficulty(dungeon->DifficultyID));
+--
+-- Group::SetDungeonDifficulty is not session-local. It writes `groups`.
+-- `difficulty` directly and pushes the value into every member, which the
+-- character save then persists to `characters`.`dungeon_difficulty`. One
+-- completed LFG run therefore left the whole party's saved difficulty holding a
+-- raw id.
+--
+-- Until now that was self-consistent and invisible: the old lookup was ALSO
+-- keyed on raw ids, so a stored raw 2 found the heroic row and worked. The core
+-- has now moved the lookup to the internal key space, where 2 means CHALLENGE.
+-- Ordinary heroic dungeons have no challenge row, so those characters would get
+-- AREA_LOCKSTATUS_MISSING_DIFFICULTY at the portal.
+--
+-- That state is not recoverable in game. The client's difficulty setter opcode
+-- has no registered handler, so an affected player cannot select another
+-- difficulty to escape it. Without this statement the only remedy is a manual
+-- database edit.
+--
+-- CLAMPED TO 0, NOT TRANSLATED. Mapping raw->internal would look more faithful
+-- and would be worse. The dungeon whose DifficultyID was read came from
+-- LookupEntry on a store that was indexed by ROW ORDINAL rather than by id, so
+-- the tier that got stored belonged to an unrelated dungeon and never described
+-- what the player queued for. There is no intent in these values to preserve;
+-- translating noise would only make it look deliberate. Normal is the safe
+-- landing point because every instanceable map has a normal tier, so no
+-- character is left holding a difficulty its map cannot offer.
+--
+-- Safe because the structure gate makes the key space unambiguous. A database
+-- still on structure 01 has only ever been written by cores predating the
+-- split, and in those the sole origin of a non-zero dungeon difficulty was the
+-- LFG cast above -- every other caller either propagates an existing value,
+-- loads one, or belongs to an opcode handler that was never registered. So at
+-- this point every non-zero value is raw by construction, and there are no
+-- correctly-keyed values here to damage.
+--
+-- `groups`.`raiddifficulty` is deliberately NOT touched. It has no pre-split
+-- writer at all: the LFG path called only the dungeon setter, and the raid
+-- opcode handler was likewise unregistered, so the column can only hold its
+-- default. Clamping it would be an unjustified write to player data.
+-- ============================================================================
+
+UPDATE `characters` SET `dungeon_difficulty` = 0 WHERE `dungeon_difficulty` <> 0;
+UPDATE `groups` SET `difficulty` = 0 WHERE `difficulty` <> 0;
 
         -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -
         -- -- PLACE UPDATE SQL ABOVE -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
