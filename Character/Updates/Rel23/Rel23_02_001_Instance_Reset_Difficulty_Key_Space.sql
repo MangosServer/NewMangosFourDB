@@ -139,6 +139,29 @@ DELETE FROM `instance_reset`;
 -- writer at all: the LFG path called only the dungeon setter, and the raid
 -- opcode handler was likewise unregistered, so the column can only hold its
 -- default. Clamping it would be an unjustified write to player data.
+--
+-- Nor is a RAID tier recovered out of `groups`.`difficulty` before it is
+-- cleared. The old LFG path did send raids through the dungeon setter, so a raw
+-- raid id (3, 4, 5, 6, 9) could be sitting in that column -- but it is not worth
+-- migrating into `raiddifficulty`, for two reasons. The core already refuses it:
+-- Group::LoadGroupFromDB clamps anything above internal HEROIC to NORMAL, so
+-- every one of those ids is discarded at load whether this update runs or not.
+-- And it never meant what it appears to mean: it was read through a LookupEntry
+-- that returned the Nth ROW rather than the row with that id, so the tier
+-- belonged to an unrelated dungeon. Promoting it would turn noise into a raid
+-- difficulty the group never chose.
+--
+-- WHAT THIS UPDATE DOES NOT FIX, stated because an admin should not have to
+-- discover it: a pre-split LFG run that stored raw 1 also created its `instance`
+-- row at difficulty 1, and internal 1 is a legitimate HEROIC save. Clearing the
+-- owner's selected tier does not remove it, so a character can keep a heroic
+-- lockout for a dungeon they queued for on normal, until it resets.
+--
+-- It is left alone because it cannot be identified. A stale raw 1 is numerically
+-- identical to a heroic save a player genuinely earned, and it carries the same
+-- reset shape, so no test separates them. Deleting every difficulty-1 instance
+-- row would destroy real lockouts to clear imaginary ones, which is a far worse
+-- trade than one stale lockout expiring on its own.
 -- ============================================================================
 
 UPDATE `characters` SET `dungeon_difficulty` = 0 WHERE `dungeon_difficulty` <> 0;
