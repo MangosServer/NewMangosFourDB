@@ -91,11 +91,17 @@ DELETE FROM `instance_reset`;
 -- completed LFG run therefore left the whole party's saved difficulty holding a
 -- raw id.
 --
--- Until now that was self-consistent and invisible: the old lookup was ALSO
--- keyed on raw ids, so a stored raw 2 found the heroic row and worked. The core
--- has now moved the lookup to the internal key space, where 2 means CHALLENGE.
--- Ordinary heroic dungeons have no challenge row, so those characters would get
--- AREA_LOCKSTATUS_MISSING_DIFFICULTY at the portal.
+-- Until now that was self-consistent and invisible AT THE PORTAL: the old lookup
+-- was ALSO keyed on raw ids, so a stored raw 2 found the heroic MapDifficulty row
+-- and the area trigger let the player through. It is worth being exact about what
+-- happened next, because it sets the severity -- the map was then instantiated at
+-- spawn mode 2, and no five-man map carries a single bit-2 creature or gameobject
+-- spawn, so the dungeon they entered was empty. The old behaviour was not
+-- working; it was broken in a quieter way.
+--
+-- The core has now moved the lookup to the internal key space, where 2 means
+-- CHALLENGE. Ordinary heroic dungeons have no challenge row, so those characters
+-- are now refused outright with AREA_LOCKSTATUS_MISSING_DIFFICULTY.
 --
 -- That state is not recoverable in game. The client's difficulty setter opcode
 -- has no registered handler, so an affected player cannot select another
