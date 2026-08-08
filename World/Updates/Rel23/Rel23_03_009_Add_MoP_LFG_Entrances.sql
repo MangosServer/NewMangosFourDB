@@ -1,4 +1,4 @@
--- Add the missing 5.4.8 dungeon entrance targets used by Dungeon Finder.
+-- Add the missing 5.4.8 entrance targets used by Dungeon Finder.
 --
 -- Destination evidence: decoded build-18414 SMSG_NEW_WORLD bodies under
 -- MoPSniff catalogue generation
@@ -67,7 +67,7 @@ main: BEGIN
     START TRANSACTION;
 
     DELETE FROM `areatrigger_teleport`
-     WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315);
+     WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315, 9052);
 
     INSERT INTO `areatrigger_teleport`
         (`id`, `name`, `required_level`, `required_item`, `required_item2`,
@@ -100,11 +100,17 @@ main: BEGIN
          1007, 199.87600708007812, 125.34600067138672, 138.42999267578125, 4.6774821281433105),
         -- capture-000059:348818; 19 of 21 map-1011 arrivals
         (8315, 'Siege of Niuzao Temple - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         1011, 1463.904541015625, 5110.861328125, 156.8542022705078, 0);
+         1011, 1463.904541015625, 5110.861328125, 156.8542022705078, 0),
+        -- capture-000220:918 and capture-001041:1725; 2 of 2 map-1148 arrivals.
+        -- Both are preceded by a one-player LFD proposal for dungeon entry 640.
+        -- AreaTrigger 9052 is the shipped trigger nearest the captured pre-transfer
+        -- position at the Temple of the White Tiger.
+        (9052, 'Proving Grounds - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
+         1148, 3756.820068359375, 521.7769775390625, 639.6920166015625, 2.509591579437256);
 
     SELECT COUNT(*) INTO v_count
       FROM `areatrigger_teleport`
-     WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315);
+     WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315, 9052);
 
     SELECT COUNT(*) INTO v_exact
       FROM `areatrigger_teleport`
@@ -158,9 +164,14 @@ main: BEGIN
              AND ABS(`target_position_y` - 5110.861328125) <= 0.001
              AND ABS(`target_position_z` - 156.8542022705078) <= 0.001
              AND ABS(`target_orientation`) <= 0.00001)
+         OR (`id` = 9052 AND `target_map` = 1148
+             AND ABS(`target_position_x` - 3756.820068359375) <= 0.001
+             AND ABS(`target_position_y` - 521.7769775390625) <= 0.001
+             AND ABS(`target_position_z` - 639.6920166015625) <= 0.001
+             AND ABS(`target_orientation` - 2.509591579437256) <= 0.00001)
        );
 
-    IF v_count <> 9 OR v_exact <> 9 THEN
+    IF v_count <> 10 OR v_exact <> 10 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'MoP LFG entrance postcondition failed';
     END IF;
@@ -168,7 +179,7 @@ main: BEGIN
     INSERT INTO `db_version`
         (`version`, `structure`, `content`, `description`, `comment`) VALUES
         (23, 3, 9, 'Add MoP LFG Entrances',
-         'Add nine build-18414 dungeon entrance targets for Dungeon Finder');
+         'Add ten build-18414 entrance targets for Dungeon Finder');
 
     COMMIT;
     SELECT '* UPDATE COMPLETE *' AS `Status`,
@@ -184,7 +195,7 @@ DROP PROCEDURE IF EXISTS `update_mangos`;
 SELECT `id`, `target_map`, `target_position_x`, `target_position_y`,
        `target_position_z`, `target_orientation`
   FROM `areatrigger_teleport`
- WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315)
+ WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315, 9052)
  ORDER BY `target_map`;
 
 SELECT `version`, `structure`, `content`, `description`
