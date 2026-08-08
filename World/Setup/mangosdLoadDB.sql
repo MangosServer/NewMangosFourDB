@@ -851,6 +851,24 @@ CREATE TABLE `disenchant_loot_template` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `dungeonfinder_entrance`
+--
+
+DROP TABLE IF EXISTS `dungeonfinder_entrance`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `dungeonfinder_entrance` (
+  `dungeon_id` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'The concrete LfgDungeons.dbc ID.',
+  `target_map` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'The destination map ID.',
+  `target_position_x` float NOT NULL DEFAULT 0,
+  `target_position_y` float NOT NULL DEFAULT 0,
+  `target_position_z` float NOT NULL DEFAULT 0,
+  `target_orientation` float NOT NULL DEFAULT 0,
+  PRIMARY KEY (`dungeon_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Dungeon Finder Entrances';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `dungeonfinder_item_rewards`
 --
 

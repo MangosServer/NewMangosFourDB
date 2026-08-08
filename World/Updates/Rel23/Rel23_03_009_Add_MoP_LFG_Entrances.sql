@@ -3,8 +3,9 @@
 -- Destination evidence: decoded build-18414 SMSG_NEW_WORLD bodies under
 -- MoPSniff catalogue generation
 -- 2BE10C899585BAECD237705AC13BBF9262D81B6BDC085B462808C6869CE88752.
--- Each destination below is the dominant repeated arrival for its map; the
--- AreaTrigger IDs are present in the shipped build-18414 AreaTrigger.dbc.
+-- Physical portal destinations remain in areatrigger_teleport. Proving Grounds
+-- is LFG-only, so dungeon 640 uses the concrete-ID keyed table instead of the
+-- walkable world AreaTrigger 9052 at the Temple of the White Tiger.
 
 DROP PROCEDURE IF EXISTS `update_mangos`;
 
@@ -17,6 +18,12 @@ main: BEGIN
     DECLARE v_content INT DEFAULT NULL;
     DECLARE v_count INT DEFAULT 0;
     DECLARE v_exact INT DEFAULT 0;
+    DECLARE v_physical_count INT DEFAULT 0;
+    DECLARE v_physical_exact INT DEFAULT 0;
+    DECLARE v_lfg_count INT DEFAULT 0;
+    DECLARE v_lfg_exact INT DEFAULT 0;
+    DECLARE v_unsafe INT DEFAULT 0;
+    DECLARE v_is_current BOOL DEFAULT FALSE;
     DECLARE v_sql_message TEXT DEFAULT NULL;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
@@ -32,87 +39,173 @@ main: BEGIN
      ORDER BY `version` DESC, `structure` DESC, `content` DESC
      LIMIT 1;
 
-    IF v_version = 23 AND v_structure = 3 AND v_content = 9 THEN
-        SELECT '* UPDATE SKIPPED *' AS `Status`,
-               '23.03.009 is already current' AS `Detail`;
-        LEAVE main;
-    END IF;
+    SET v_is_current = COALESCE(
+        v_version = 23 AND v_structure = 3 AND v_content = 9, FALSE);
 
-    IF v_version IS NULL OR v_version <> 23 OR v_structure <> 3 OR v_content <> 8 THEN
+    IF NOT v_is_current AND
+       (v_version IS NULL OR v_version <> 23 OR v_structure <> 3 OR v_content <> 8) THEN
         SELECT '* UPDATE FAILED *' AS `Status`,
                'database version must be exactly 23.03.008' AS `Failed gate`;
         LEAVE main;
     END IF;
 
+    IF NOT v_is_current THEN
+        -- Refuse before DDL when the transaction-owned input tables are unsafe.
+        SELECT COUNT(*) INTO v_count
+          FROM `information_schema`.`tables`
+         WHERE `table_schema` = DATABASE()
+           AND ((`table_name` = 'db_version' AND `engine` = 'InnoDB')
+             OR (`table_name` = 'areatrigger_teleport' AND `engine` = 'InnoDB'));
+        IF v_count <> 2 THEN
+            SELECT '* UPDATE FAILED *' AS `Status`,
+                   'db_version and areatrigger_teleport must both be InnoDB' AS `Failed gate`;
+            LEAVE main;
+        END IF;
+
+        SELECT COUNT(*) INTO v_count
+          FROM `db_version`
+         WHERE `version` = 23 AND `structure` = 3 AND `content` = 9;
+        IF v_count <> 0 THEN
+            SELECT '* UPDATE FAILED *' AS `Status`,
+                   'db_version row 23.03.009 already exists below current' AS `Failed gate`;
+            LEAVE main;
+        END IF;
+
+        -- DDL auto-commits. Running it only after the exact input-version gate
+        -- avoids mutating a wrong-version database; IF NOT EXISTS makes a retry
+        -- after a later transactional failure safe.
+        CREATE TABLE IF NOT EXISTS `dungeonfinder_entrance` (
+          `dungeon_id` mediumint(8) unsigned NOT NULL DEFAULT 0 COMMENT 'The concrete LfgDungeons.dbc ID.',
+          `target_map` smallint(5) unsigned NOT NULL DEFAULT 0 COMMENT 'The destination map ID.',
+          `target_position_x` float NOT NULL DEFAULT 0,
+          `target_position_y` float NOT NULL DEFAULT 0,
+          `target_position_z` float NOT NULL DEFAULT 0,
+          `target_orientation` float NOT NULL DEFAULT 0,
+          PRIMARY KEY (`dungeon_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Dungeon Finder Entrances';
+    END IF;
+
+    -- Both a first apply and an already-current re-run must prove the table is
+    -- usable. A current version with missing or drifted artifacts is a failure,
+    -- not a successful skip.
     SELECT COUNT(*) INTO v_count
       FROM `information_schema`.`tables`
      WHERE `table_schema` = DATABASE()
        AND ((`table_name` = 'db_version' AND `engine` = 'InnoDB')
-         OR (`table_name` = 'areatrigger_teleport' AND `engine` = 'InnoDB'));
-    IF v_count <> 2 THEN
+         OR (`table_name` = 'areatrigger_teleport' AND `engine` = 'InnoDB')
+         OR (`table_name` = 'dungeonfinder_entrance' AND `engine` = 'InnoDB'));
+    IF v_count <> 3 THEN
         SELECT '* UPDATE FAILED *' AS `Status`,
-               'db_version and areatrigger_teleport must both be InnoDB' AS `Failed gate`;
+               'db_version, areatrigger_teleport and dungeonfinder_entrance must be InnoDB' AS `Failed gate`;
         LEAVE main;
     END IF;
 
     SELECT COUNT(*) INTO v_count
-      FROM `db_version`
-     WHERE `version` = 23 AND `structure` = 3 AND `content` = 9;
-    IF v_count <> 0 THEN
-        SELECT '* UPDATE FAILED *' AS `Status`,
-               'db_version row 23.03.009 already exists below current' AS `Failed gate`;
-        LEAVE main;
-    END IF;
-
-    START TRANSACTION;
-
-    DELETE FROM `areatrigger_teleport`
-     WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315, 9052);
-
-    INSERT INTO `areatrigger_teleport`
-        (`id`, `name`, `required_level`, `required_item`, `required_item2`,
-         `heroic_key`, `heroic_key2`, `required_quest_done`,
-         `required_quest_done_heroic`, `target_map`, `target_position_x`,
-         `target_position_y`, `target_position_z`, `target_orientation`) VALUES
-        -- capture-000059:66903; 15 of 16 map-959 arrivals
-        (7694, 'Shado-Pan Monastery - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         959, 3657.2900390625, 2551.919921875, 766.9660034179688, 0.4363323152065277),
-        -- capture-000059:548319; 17 of 17 map-960 arrivals
-        (7854, 'Temple of the Jade Serpent - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         960, 953.3698120117188, -2487.5, 180.4305877685547, 4.369081020355225),
-        -- capture-000059:440550; 13 of 14 map-961 arrivals
-        (7705, 'Stormstout Brewery - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         961, -732.1145629882812, 1266.126708984375, 116.1080093383789, 1.8120787143707275),
-        -- capture-000020:14050; 32 of 34 map-962 arrivals
-        (7726, 'Gate of the Setting Sun - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         962, 722.0972290039062, 2108.085205078125, 402.9779968261719, 1.5926363468170166),
-        -- capture-000059:1109779; 17 of 17 map-994 arrivals
-        (8134, 'Mogu''shan Palace - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         994, -3969.670166015625, -2542.7119140625, 26.753700256347656, 4.71238899230957),
-        -- capture-000059:6137; 11 of 11 map-1001 arrivals
-        (614, 'Scarlet Halls - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         1001, 820.7430419921875, 607.8125, 13.638883590698242, 0),
-        -- capture-000059:273582; 15 of 15 map-1004 arrivals
-        (45, 'Scarlet Monastery - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         1004, 1124.6441650390625, 512.467041015625, 0.9895489811897278, 1.5707963705062866),
-        -- capture-000059:193434; 11 of 11 map-1007 arrivals
-        (2567, 'Scholomance - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         1007, 199.87600708007812, 125.34600067138672, 138.42999267578125, 4.6774821281433105),
-        -- capture-000059:348818; 19 of 21 map-1011 arrivals
-        (8315, 'Siege of Niuzao Temple - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         1011, 1463.904541015625, 5110.861328125, 156.8542022705078, 0),
-        -- capture-000220:918 and capture-001041:1725; 2 of 2 map-1148 arrivals.
-        -- Both are preceded by a one-player LFD proposal for dungeon entry 640.
-        -- AreaTrigger 9052 is the shipped trigger nearest the captured pre-transfer
-        -- position at the Temple of the White Tiger.
-        (9052, 'Proving Grounds - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
-         1148, 3756.820068359375, 521.7769775390625, 639.6920166015625, 2.509591579437256);
-
-    SELECT COUNT(*) INTO v_count
-      FROM `areatrigger_teleport`
-     WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315, 9052);
+      FROM `information_schema`.`columns`
+     WHERE `table_schema` = DATABASE()
+       AND `table_name` = 'dungeonfinder_entrance';
 
     SELECT COUNT(*) INTO v_exact
+      FROM `information_schema`.`columns`
+     WHERE `table_schema` = DATABASE()
+       AND `table_name` = 'dungeonfinder_entrance'
+       AND `is_nullable` = 'NO'
+       AND (
+            (`ordinal_position` = 1 AND `column_name` = 'dungeon_id'
+             AND `column_type` = 'mediumint(8) unsigned')
+         OR (`ordinal_position` = 2 AND `column_name` = 'target_map'
+             AND `column_type` = 'smallint(5) unsigned')
+         OR (`ordinal_position` = 3 AND `column_name` = 'target_position_x'
+             AND `column_type` = 'float')
+         OR (`ordinal_position` = 4 AND `column_name` = 'target_position_y'
+             AND `column_type` = 'float')
+         OR (`ordinal_position` = 5 AND `column_name` = 'target_position_z'
+             AND `column_type` = 'float')
+         OR (`ordinal_position` = 6 AND `column_name` = 'target_orientation'
+             AND `column_type` = 'float')
+       );
+
+    IF v_count <> 6 OR v_exact <> 6 THEN
+        SELECT '* UPDATE FAILED *' AS `Status`,
+               'dungeonfinder_entrance must have the exact six-column shape' AS `Failed gate`;
+        LEAVE main;
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+      FROM `information_schema`.`statistics`
+     WHERE `table_schema` = DATABASE()
+       AND `table_name` = 'dungeonfinder_entrance'
+       AND `index_name` = 'PRIMARY';
+
+    SELECT COUNT(*) INTO v_exact
+      FROM `information_schema`.`statistics`
+     WHERE `table_schema` = DATABASE()
+       AND `table_name` = 'dungeonfinder_entrance'
+       AND `index_name` = 'PRIMARY'
+       AND `seq_in_index` = 1
+       AND `column_name` = 'dungeon_id';
+
+    IF v_count <> 1 OR v_exact <> 1 THEN
+        SELECT '* UPDATE FAILED *' AS `Status`,
+               'dungeonfinder_entrance must be keyed only by dungeon_id' AS `Failed gate`;
+        LEAVE main;
+    END IF;
+
+    IF NOT v_is_current THEN
+        START TRANSACTION;
+
+        DELETE FROM `areatrigger_teleport`
+         WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315, 9052);
+
+        INSERT INTO `areatrigger_teleport`
+            (`id`, `name`, `required_level`, `required_item`, `required_item2`,
+             `heroic_key`, `heroic_key2`, `required_quest_done`,
+             `required_quest_done_heroic`, `target_map`, `target_position_x`,
+             `target_position_y`, `target_position_z`, `target_orientation`) VALUES
+            -- capture-000059:66903; 15 of 16 map-959 arrivals
+            (7694, 'Shado-Pan Monastery - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
+             959, 3657.2900390625, 2551.919921875, 766.9660034179688, 0.4363323152065277),
+            -- capture-000059:548319; 17 of 17 map-960 arrivals
+            (7854, 'Temple of the Jade Serpent - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
+             960, 953.3698120117188, -2487.5, 180.4305877685547, 4.369081020355225),
+            -- capture-000059:440550; 13 of 14 map-961 arrivals
+            (7705, 'Stormstout Brewery - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
+             961, -732.1145629882812, 1266.126708984375, 116.1080093383789, 1.8120787143707275),
+            -- capture-000020:14050; 32 of 34 map-962 arrivals
+            (7726, 'Gate of the Setting Sun - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
+             962, 722.0972290039062, 2108.085205078125, 402.9779968261719, 1.5926363468170166),
+            -- capture-000059:1109779; 17 of 17 map-994 arrivals
+            (8134, 'Mogu''shan Palace - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
+             994, -3969.670166015625, -2542.7119140625, 26.753700256347656, 4.71238899230957),
+            -- capture-000059:6137; 11 of 11 map-1001 arrivals
+            (614, 'Scarlet Halls - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
+             1001, 820.7430419921875, 607.8125, 13.638883590698242, 0),
+            -- capture-000059:273582; 15 of 15 map-1004 arrivals
+            (45, 'Scarlet Monastery - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
+             1004, 1124.6441650390625, 512.467041015625, 0.9895489811897278, 1.5707963705062866),
+            -- capture-000059:193434; 11 of 11 map-1007 arrivals
+            (2567, 'Scholomance - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
+             1007, 199.87600708007812, 125.34600067138672, 138.42999267578125, 4.6774821281433105),
+            -- capture-000059:348818; 19 of 21 map-1011 arrivals
+            (8315, 'Siege of Niuzao Temple - Entrance Target', 0, 0, 0, 0, 0, 0, 0,
+             1011, 1463.904541015625, 5110.861328125, 156.8542022705078, 0);
+
+        DELETE FROM `dungeonfinder_entrance` WHERE `dungeon_id` = 640;
+
+        INSERT INTO `dungeonfinder_entrance`
+            (`dungeon_id`, `target_map`, `target_position_x`, `target_position_y`,
+             `target_position_z`, `target_orientation`) VALUES
+            -- capture-000220:918 and capture-001041:1725; both one-player
+            -- proposals carry concrete LfgDungeons entry 640.
+            (640, 1148, 3756.820068359375, 521.7769775390625,
+             639.6920166015625, 2.509591579437256);
+    END IF;
+
+    SELECT COUNT(*) INTO v_physical_count
+      FROM `areatrigger_teleport`
+     WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315);
+
+    SELECT COUNT(*) INTO v_physical_exact
       FROM `areatrigger_teleport`
      WHERE `required_level` = 0
        AND `required_item` = 0 AND `required_item2` = 0
@@ -164,41 +257,52 @@ main: BEGIN
              AND ABS(`target_position_y` - 5110.861328125) <= 0.001
              AND ABS(`target_position_z` - 156.8542022705078) <= 0.001
              AND ABS(`target_orientation`) <= 0.00001)
-         OR (`id` = 9052 AND `target_map` = 1148
-             AND ABS(`target_position_x` - 3756.820068359375) <= 0.001
-             AND ABS(`target_position_y` - 521.7769775390625) <= 0.001
-             AND ABS(`target_position_z` - 639.6920166015625) <= 0.001
-             AND ABS(`target_orientation` - 2.509591579437256) <= 0.00001)
        );
 
-    IF v_count <> 10 OR v_exact <> 10 THEN
+    SELECT COUNT(*) INTO v_unsafe
+      FROM `areatrigger_teleport`
+     WHERE `id` = 9052;
+
+    SELECT COUNT(*) INTO v_lfg_count
+      FROM `dungeonfinder_entrance`
+     WHERE `dungeon_id` = 640;
+
+    SELECT COUNT(*) INTO v_lfg_exact
+      FROM `dungeonfinder_entrance`
+     WHERE `dungeon_id` = 640
+       AND `target_map` = 1148
+       AND ABS(`target_position_x` - 3756.820068359375) <= 0.001
+       AND ABS(`target_position_y` - 521.7769775390625) <= 0.001
+       AND ABS(`target_position_z` - 639.6920166015625) <= 0.001
+       AND ABS(`target_orientation` - 2.509591579437256) <= 0.00001;
+
+    IF v_physical_count <> 9 OR v_physical_exact <> 9 OR v_unsafe <> 0 OR
+       v_lfg_count <> 1 OR v_lfg_exact <> 1 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'MoP LFG entrance postcondition failed';
+    END IF;
+
+    IF v_is_current THEN
+        SELECT '* UPDATE SKIPPED *' AS `Status`,
+               '23.03.009 is already current and validated' AS `Detail`,
+               v_physical_exact AS `Physical entrance rows`,
+               v_lfg_exact AS `LFG-only entrance rows`;
+        LEAVE main;
     END IF;
 
     INSERT INTO `db_version`
         (`version`, `structure`, `content`, `description`, `comment`) VALUES
         (23, 3, 9, 'Add MoP LFG Entrances',
-         'Add ten build-18414 entrance targets for Dungeon Finder');
+         'Add nine physical and one LFG-only build-18414 Dungeon Finder entrances');
 
     COMMIT;
     SELECT '* UPDATE COMPLETE *' AS `Status`,
            '23.03.009' AS `Database version`,
-           v_exact AS `Entrance rows`;
+           v_physical_exact AS `Physical entrance rows`,
+           v_lfg_exact AS `LFG-only entrance rows`;
 END main$$
 
 DELIMITER ;
 
 CALL `update_mangos`();
 DROP PROCEDURE IF EXISTS `update_mangos`;
-
-SELECT `id`, `target_map`, `target_position_x`, `target_position_y`,
-       `target_position_z`, `target_orientation`
-  FROM `areatrigger_teleport`
- WHERE `id` IN (45, 614, 2567, 7694, 7705, 7726, 7854, 8134, 8315, 9052)
- ORDER BY `target_map`;
-
-SELECT `version`, `structure`, `content`, `description`
-  FROM `db_version`
- ORDER BY `version` DESC, `structure` DESC, `content` DESC
- LIMIT 1;
