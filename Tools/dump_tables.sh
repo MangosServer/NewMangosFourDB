@@ -52,6 +52,7 @@ for TABLE in \
 `db_version` \
 `disables` \
 `disenchant_loot_template` \
+`dungeonfinder_entrance` \
 `dungeonfinder_item_rewards` \
 `dungeonfinder_requirements` \
 `dungeonfinder_rewards` \
