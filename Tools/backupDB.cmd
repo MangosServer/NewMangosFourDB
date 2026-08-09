@@ -417,6 +417,7 @@ call :BackupTable db_scripts %wdb% _full_worlddb %loadworldDB%
 call :BackupTable db_version %wdb% _full_worlddb %loadworldDB%
 call :BackupTable disables %wdb% _full_worlddb %loadworldDB%
 call :BackupTable disenchant_loot_template %wdb% _full_worlddb %loadworldDB%
+call :BackupTable dungeonfinder_entrance %wdb% _full_worlddb %loadworldDB%
 call :BackupTable dungeonfinder_item_rewards %wdb% _full_worlddb %loadworldDB%
 call :BackupTable dungeonfinder_requirements %wdb% _full_worlddb %loadworldDB%
 call :BackupTable dungeonfinder_rewards %wdb% _full_worlddb %loadworldDB%
