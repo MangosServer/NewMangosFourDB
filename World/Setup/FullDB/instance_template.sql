@@ -130,7 +130,10 @@ INSERT INTO `instance_template` (`map`, `parent`, `levelMin`, `levelMax`) VALUES
 (938,0,85,0),
 (939,0,85,0),
 (940,0,85,0),
-(967,0,85,0);
+(967,0,85,0),
+-- Proving Grounds. MAP_SCENARIO counts as a dungeon for MapEntry::IsDungeon,
+-- so IsValidMAP demands a template row before the dungeon 640 entrance loads.
+(1148,0,0,0);
 /*!40000 ALTER TABLE `instance_template` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

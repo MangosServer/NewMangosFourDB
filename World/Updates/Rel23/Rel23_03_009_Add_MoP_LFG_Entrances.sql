@@ -110,19 +110,25 @@ main: BEGIN
      WHERE `table_schema` = DATABASE()
        AND `table_name` = 'dungeonfinder_entrance'
        AND `is_nullable` = 'NO'
+       -- data_type, not column_type: MySQL 8.0.19 and later drop the deprecated
+       -- integer display width, so column_type reads 'mediumint unsigned' there and
+       -- 'mediumint(8) unsigned' on MariaDB. Matching the literal would leave v_exact
+       -- below 6 on a supported MySQL and stop this update at the gate below -- on the
+       -- very table it had just created. data_type carries neither the width nor the
+       -- sign, so signedness is tested separately.
        AND (
             (`ordinal_position` = 1 AND `column_name` = 'dungeon_id'
-             AND `column_type` = 'mediumint(8) unsigned')
+             AND `data_type` = 'mediumint' AND `column_type` LIKE '%unsigned%')
          OR (`ordinal_position` = 2 AND `column_name` = 'target_map'
-             AND `column_type` = 'smallint(5) unsigned')
+             AND `data_type` = 'smallint' AND `column_type` LIKE '%unsigned%')
          OR (`ordinal_position` = 3 AND `column_name` = 'target_position_x'
-             AND `column_type` = 'float')
+             AND `data_type` = 'float' AND `column_type` NOT LIKE '%unsigned%')
          OR (`ordinal_position` = 4 AND `column_name` = 'target_position_y'
-             AND `column_type` = 'float')
+             AND `data_type` = 'float' AND `column_type` NOT LIKE '%unsigned%')
          OR (`ordinal_position` = 5 AND `column_name` = 'target_position_z'
-             AND `column_type` = 'float')
+             AND `data_type` = 'float' AND `column_type` NOT LIKE '%unsigned%')
          OR (`ordinal_position` = 6 AND `column_name` = 'target_orientation'
-             AND `column_type` = 'float')
+             AND `data_type` = 'float' AND `column_type` NOT LIKE '%unsigned%')
        );
 
     IF v_count <> 6 OR v_exact <> 6 THEN
