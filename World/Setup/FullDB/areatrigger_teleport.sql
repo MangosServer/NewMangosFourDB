@@ -59,6 +59,7 @@ INSERT INTO `areatrigger_teleport` (`id`, `name`, `required_level`, `required_it
 (604,'Scarlet Monastery Exit Target 02',20,0,0,0,0,0,0,0,2915.13,-823.637,160.327,3.49066),
 (606,'Scarlet Monastery Exit Target 03',20,0,0,0,0,0,0,0,2885.96,-835.802,160.327,0.349066),
 (608,'Scarlet Monastery Exit Target 04',20,0,0,0,0,0,0,0,2869.32,-820.818,160.333,0.349066),
+-- Keep 610/612 on populated legacy map 189 until maps 1001/1004 have spawn data.
 (610,'Scarlet Monastery Entrance Target 02',20,0,0,0,0,0,0,189,853.179,1319.18,18.6714,1.5708),
 (612,'Scarlet Monastery Entrance Target 03',20,0,0,0,0,0,0,189,1608.1,-318.919,18.6714,4.71239),
 (614,'Scarlet Halls - Entrance Target',0,0,0,0,0,0,0,1001,820.7430419921875,607.8125,13.638883590698242,0),
