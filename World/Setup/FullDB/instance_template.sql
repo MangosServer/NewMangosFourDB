@@ -130,22 +130,7 @@ INSERT INTO `instance_template` (`map`, `parent`, `levelMin`, `levelMax`) VALUES
 (938,0,85,0),
 (939,0,85,0),
 (940,0,85,0),
-(967,0,85,0),
--- Every dungeon destination needs a row here or IsValidMAP rejects it, and this
--- snapshot is rebuilt without the update migrations applied. 959-1011 are the MoP
--- destinations established by Rel23_02_074 and never folded back in; 1148 is
--- Proving Grounds, whose MAP_SCENARIO type still counts as a dungeon for
--- MapEntry::IsDungeon and so needs one too.
-(959,0,0,0),
-(960,0,0,0),
-(961,0,0,0),
-(962,0,0,0),
-(994,0,0,0),
-(1001,0,0,0),
-(1004,0,0,0),
-(1007,0,0,0),
-(1011,0,0,0),
-(1148,0,0,0);
+(967,0,85,0);
 /*!40000 ALTER TABLE `instance_template` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

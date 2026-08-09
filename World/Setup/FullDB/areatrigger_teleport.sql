@@ -27,7 +27,7 @@ TRUNCATE TABLE `areatrigger_teleport`;
 LOCK TABLES `areatrigger_teleport` WRITE;
 /*!40000 ALTER TABLE `areatrigger_teleport` DISABLE KEYS */;
 INSERT INTO `areatrigger_teleport` (`id`, `name`, `required_level`, `required_item`, `required_item2`, `heroic_key`, `heroic_key2`, `required_quest_done`, `required_quest_done_heroic`, `target_map`, `target_position_x`, `target_position_y`, `target_position_z`, `target_orientation`) VALUES 
-(45,'Scarlet Monastery - Entrance Target',0,0,0,0,0,0,0,1004,1124.6441650390625,512.467041015625,0.9895489811897278,1.5707963705062866),
+(45,'Scarlet Monastery Entrance Target 01',20,0,0,0,0,0,0,189,1687.27,1050.09,18.6773,1.5708),
 (78,'Deadmines Entrance Target',10,0,0,0,0,0,0,36,-14.5732,-385.475,62.4561,1.5708),
 (101,'Stormwind Jail Entrance Target',15,0,0,0,0,0,0,34,48.9849,0.483882,-16.3942,6.28319),
 (107,'Stormwind Vault Entrance',0,0,0,0,0,0,0,35,-0.91,40.57,-24.23,0),
@@ -59,10 +59,9 @@ INSERT INTO `areatrigger_teleport` (`id`, `name`, `required_level`, `required_it
 (604,'Scarlet Monastery Exit Target 02',20,0,0,0,0,0,0,0,2915.13,-823.637,160.327,3.49066),
 (606,'Scarlet Monastery Exit Target 03',20,0,0,0,0,0,0,0,2885.96,-835.802,160.327,0.349066),
 (608,'Scarlet Monastery Exit Target 04',20,0,0,0,0,0,0,0,2869.32,-820.818,160.333,0.349066),
--- Keep 610/612 on populated legacy map 189 until maps 1001/1004 have spawn data.
 (610,'Scarlet Monastery Entrance Target 02',20,0,0,0,0,0,0,189,853.179,1319.18,18.6714,1.5708),
 (612,'Scarlet Monastery Entrance Target 03',20,0,0,0,0,0,0,189,1608.1,-318.919,18.6714,4.71239),
-(614,'Scarlet Halls - Entrance Target',0,0,0,0,0,0,0,1001,820.7430419921875,607.8125,13.638883590698242,0),
+(614,'Scarlet Monastery Entrance Target 04',20,0,0,0,0,0,0,189,253.672,-206.624,18.6773,4.71239),
 (702,'Stormwind - Mage Exit Target',0,0,0,0,0,0,0,0,-9014.94,873.326,148.616,5.23599),
 (704,'Stormwind - Mage Entrance Target',0,0,0,0,0,0,0,0,-9016.97,885.436,29.6207,5.41052),
 (882,'Uldaman Exit Target Rear',0,0,0,0,0,0,0,0,-6619.97,-3765.74,266.309,3.40339),
@@ -96,7 +95,7 @@ INSERT INTO `areatrigger_teleport` (`id`, `name`, `required_level`, `required_it
 (2547,'Scholomance - Out',0,0,0,0,0,0,0,289,332.866,94.3108,92.2221,0),
 (2548,'Scholomance - Out',0,0,0,0,0,0,0,289,322.884,112.137,98.6726,0),
 (2549,'Scholomance - Out',0,0,0,0,0,0,0,289,325.184,75.6181,93.8744,0),
-(2567,'Scholomance - Entrance Target',0,0,0,0,0,0,0,1007,199.87600708007812,125.34600067138672,138.42999267578125,4.6774821281433105),
+(2567,'Scholomance - Entrance target',45,0,0,0,0,0,0,289,199.876,125.346,138.43,4.67748),
 (2568,'Scholomance - Stairs Exit Target 001',45,0,0,0,0,0,0,0,1273.91,-2553.09,91.8393,3.57792),
 (2606,'Alterac Valley - Horde Exit Target',0,0,0,0,0,0,0,0,536.495,-1085.72,106.27,3.66519),
 (2608,'Alterac Valley - Alliance Exit Target',0,0,0,0,0,0,0,0,101.144,-184.934,127.344,4.88692),
@@ -376,13 +375,7 @@ INSERT INTO `areatrigger_teleport` (`id`, `name`, `required_level`, `required_it
 (7161,'CoT 4.3 - Well of Eternity - Exit Target (In Kalimdor)',0,0,0,0,0,0,0,1,-8599.41,-4015.61,-205.547,4.59022),
 (7162,'CoT 4.3 - End Time - Exit Target (In Kalimdor)',0,0,0,0,0,0,0,1,-8304.37,-4461.43,-208.077,3.59538),
 (7163,'CoT 4.3 - Hour of Twilight - Exit Target (In Kalimdor)',0,0,0,0,0,0,0,1,-8291.52,-4561.34,-223.312,1.48353),
-(7164,'CoT 4.3 - Dragon Soul - Exit Target (In Kalimdor)',0,0,0,0,0,0,0,1,-8280.75,-4521.05,-219.09,3.63028),
-(7694,'Shado-Pan Monastery - Entrance Target',0,0,0,0,0,0,0,959,3657.2900390625,2551.919921875,766.9660034179688,0.4363323152065277),
-(7705,'Stormstout Brewery - Entrance Target',0,0,0,0,0,0,0,961,-732.1145629882812,1266.126708984375,116.1080093383789,1.8120787143707275),
-(7726,'Gate of the Setting Sun - Entrance Target',0,0,0,0,0,0,0,962,722.0972290039062,2108.085205078125,402.9779968261719,1.5926363468170166),
-(7854,'Temple of the Jade Serpent - Entrance Target',0,0,0,0,0,0,0,960,953.3698120117188,-2487.5,180.4305877685547,4.369081020355225),
-(8134,'Mogu''shan Palace - Entrance Target',0,0,0,0,0,0,0,994,-3969.670166015625,-2542.7119140625,26.753700256347656,4.71238899230957),
-(8315,'Siege of Niuzao Temple - Entrance Target',0,0,0,0,0,0,0,1011,1463.904541015625,5110.861328125,156.8542022705078,0);
+(7164,'CoT 4.3 - Dragon Soul - Exit Target (In Kalimdor)',0,0,0,0,0,0,0,1,-8280.75,-4521.05,-219.09,3.63028);
 /*!40000 ALTER TABLE `areatrigger_teleport` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
