@@ -521,7 +521,10 @@ call :BackupTable spell_template %wdb% _full_worlddb %loadworldDB%
 call :BackupTable spell_threat %wdb% _full_worlddb %loadworldDB%
 call :BackupTable transports %wdb% _full_worlddb %loadworldDB%
 call :BackupTable vehicle_accessory %wdb% _full_worlddb %loadworldDB%
-call :BackupTable warden_checks %wdb% _full_worlddb %loadworldDB%
+call :DumpOptionalTable "%wdb%" "_full_worlddb" "%loadworldDB%" "warden"
+if errorlevel 1 goto error
+call :DumpOptionalTable "%wdb%" "_full_worlddb" "%loadworldDB%" "warden_checks"
+if errorlevel 1 goto error
 
 goto CharDB:
 
@@ -617,6 +620,8 @@ call :BackupTable petition_sign %cdb% _full_chardb %loadcharDB%
 call :BackupTable pvpstats_players %cdb% _full_chardb %loadcharDB%
 call :BackupTable quest_tracker %cdb% _full_chardb %loadcharDB%
 call :BackupTable saved_variables %cdb% _full_chardb %loadcharDB%
+call :DumpOptionalTable "%cdb%" "_full_chardb" "%loadcharDB%" "warden_action"
+if errorlevel 1 goto error
 call :BackupTable world %cdb% _full_chardb %loadcharDB%
 goto RealmDB:
 
@@ -642,10 +647,88 @@ call :BackupTable ip_banned %rdb% _full_realmdb %loadrealmDB%
 call :BackupTable realmcharacters %rdb% _full_realmdb %loadrealmDB%
 call :BackupTable realmlist %rdb% _full_realmdb %loadrealmDB%
 call :BackupTable uptime %rdb% _full_realmdb %loadrealmDB%
-call :BackupTable warden_incident %rdb% _full_realmdb %loadrealmDB%
-call :BackupTable warden_audit %rdb% _full_realmdb %loadrealmDB%
+call :DumpOptionalTable "%rdb%" "_full_realmdb" "%loadrealmDB%" "warden_log"
+if errorlevel 1 goto error
+call :DumpOptionalTable "%rdb%" "_full_realmdb" "%loadrealmDB%" "warden_incident"
+if errorlevel 1 goto error
+call :DumpOptionalTable "%rdb%" "_full_realmdb" "%loadrealmDB%" "warden_audit"
+if errorlevel 1 goto error
 
 goto done:
+
+:DumpOptionalTable
+setlocal
+set "OPTIONALDB=%~1"
+set "OPTIONALDIR=%~2"
+set "OPTIONALSTRUCTURE=%~3"
+set "OPTIONALTABLE=%~4"
+set "OPTIONALOUTPUT=%OPTIONALDIR%\%OPTIONALTABLE%.sql"
+set "OPTIONALPROBE=%OPTIONALDIR%\%OPTIONALTABLE%.exists.tmp"
+set "OPTIONALTEMP=%OPTIONALDIR%\%OPTIONALTABLE%.dump.tmp"
+set "OPTIONALREADY=%OPTIONALDIR%\%OPTIONALTABLE%.sql.new"
+
+if exist "%OPTIONALPROBE%" del /Q "%OPTIONALPROBE%"
+if exist "%OPTIONALTEMP%" del /Q "%OPTIONALTEMP%"
+if exist "%OPTIONALREADY%" del /Q "%OPTIONALREADY%"
+
+"%mysql%mysql.exe" --batch --skip-column-names -u%user% -p%pass% --port=%port% -h %svr% -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '%OPTIONALDB%' AND table_name = '%OPTIONALTABLE%';" > "%OPTIONALPROBE%" 2>nul
+if errorlevel 1 (
+    if exist "%OPTIONALPROBE%" del /Q "%OPTIONALPROBE%"
+    echo ERROR: Could not inspect %OPTIONALDB%.%OPTIONALTABLE%.
+    endlocal
+    exit /b 1
+)
+
+set "OPTIONALFOUND="
+set /p OPTIONALFOUND=<"%OPTIONALPROBE%"
+del /Q "%OPTIONALPROBE%"
+
+if not "%OPTIONALFOUND%" == "0" if not "%OPTIONALFOUND%" == "1" (
+    echo ERROR: Invalid table probe result for %OPTIONALDB%.%OPTIONALTABLE%.
+    endlocal
+    exit /b 1
+)
+
+if "%OPTIONALFOUND%" == "0" (
+    if exist "%OPTIONALOUTPUT%" del /Q "%OPTIONALOUTPUT%"
+    echo Skipping absent optional table %OPTIONALDB%.%OPTIONALTABLE%.
+    endlocal
+    exit /b 0
+)
+
+set "OPTIONALPARAMS="
+if /I "%OPTIONALSTRUCTURE%" == "NO" set "OPTIONALPARAMS=--add-drop-table=false --no-create-info"
+
+echo             %OPTIONALTABLE%
+"%mysql%mysqldump.exe" -Q -c -e -q %OPTIONALPARAMS% -u%user% -p%pass% --port=%port% -h %svr% %OPTIONALDB% %OPTIONALTABLE% > "%OPTIONALTEMP%"
+if errorlevel 1 (
+    if exist "%OPTIONALTEMP%" del /Q "%OPTIONALTEMP%"
+    echo ERROR: Could not dump %OPTIONALDB%.%OPTIONALTABLE%.
+    endlocal
+    exit /b 1
+)
+
+if /I "%OPTIONALSTRUCTURE%" == "NO" (
+    echo -- ---------------------------------------- > "%OPTIONALREADY%"
+    echo -- --        CLEAR DOWN THE TABLE        -- >> "%OPTIONALREADY%"
+    echo -- ---------------------------------------- >> "%OPTIONALREADY%"
+    echo TRUNCATE TABLE `%OPTIONALTABLE%`; >> "%OPTIONALREADY%"
+    echo -- ---------------------------------------- >> "%OPTIONALREADY%"
+    type "%OPTIONALTEMP%" >> "%OPTIONALREADY%"
+    del /Q "%OPTIONALTEMP%"
+) else (
+    move /Y "%OPTIONALTEMP%" "%OPTIONALREADY%" >nul
+)
+
+move /Y "%OPTIONALREADY%" "%OPTIONALOUTPUT%" >nul
+if errorlevel 1 (
+    echo ERROR: Could not publish backup for %OPTIONALDB%.%OPTIONALTABLE%.
+    endlocal
+    exit /b 1
+)
+
+endlocal
+exit /b 0
 
 
 
