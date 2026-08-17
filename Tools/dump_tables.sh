@@ -156,7 +156,7 @@ for TABLE in \
 `spell_threat` \
 `transports` \
 `vehicle_accessory` \
-`warden` \
+`warden_checks` \
 ; do
 
 echo "Dumping ${i}/139 ${TABLE}..."

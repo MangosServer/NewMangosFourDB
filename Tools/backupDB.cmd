@@ -521,7 +521,7 @@ call :BackupTable spell_template %wdb% _full_worlddb %loadworldDB%
 call :BackupTable spell_threat %wdb% _full_worlddb %loadworldDB%
 call :BackupTable transports %wdb% _full_worlddb %loadworldDB%
 call :BackupTable vehicle_accessory %wdb% _full_worlddb %loadworldDB%
-call :BackupTable warden %wdb% _full_worlddb %loadworldDB%
+call :BackupTable warden_checks %wdb% _full_worlddb %loadworldDB%
 
 goto CharDB:
 
@@ -617,7 +617,6 @@ call :BackupTable petition_sign %cdb% _full_chardb %loadcharDB%
 call :BackupTable pvpstats_players %cdb% _full_chardb %loadcharDB%
 call :BackupTable quest_tracker %cdb% _full_chardb %loadcharDB%
 call :BackupTable saved_variables %cdb% _full_chardb %loadcharDB%
-call :BackupTable warden_action %cdb% _full_chardb %loadcharDB%
 call :BackupTable world %cdb% _full_chardb %loadcharDB%
 goto RealmDB:
 
@@ -643,7 +642,8 @@ call :BackupTable ip_banned %rdb% _full_realmdb %loadrealmDB%
 call :BackupTable realmcharacters %rdb% _full_realmdb %loadrealmDB%
 call :BackupTable realmlist %rdb% _full_realmdb %loadrealmDB%
 call :BackupTable uptime %rdb% _full_realmdb %loadrealmDB%
-call :BackupTable warden_log %rdb% _full_realmdb %loadrealmDB%
+call :BackupTable warden_incident %rdb% _full_realmdb %loadrealmDB%
+call :BackupTable warden_audit %rdb% _full_realmdb %loadrealmDB%
 
 goto done:
 
