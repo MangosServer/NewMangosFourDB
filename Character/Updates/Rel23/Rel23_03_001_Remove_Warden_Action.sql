@@ -14,6 +14,7 @@ main: BEGIN
     DECLARE v_structure INT DEFAULT NULL;
     DECLARE v_content INT DEFAULT NULL;
     DECLARE v_is_current BOOL DEFAULT FALSE;
+    DECLARE v_is_superseded BOOL DEFAULT FALSE;
     DECLARE v_table_count INT DEFAULT 0;
     DECLARE v_sql_message TEXT DEFAULT NULL;
 
@@ -33,15 +34,20 @@ main: BEGIN
 
     SET v_is_current = COALESCE(
         v_version = 23 AND v_structure = 3 AND v_content = 1, FALSE);
+    SET v_is_superseded = COALESCE(
+        v_version > 23 OR
+        (v_version = 23 AND
+         (v_structure > 3 OR
+          (v_structure = 3 AND v_content > 1))), FALSE);
 
-    IF NOT v_is_current AND
+    IF NOT v_is_current AND NOT v_is_superseded AND
        (v_version IS NULL OR v_version <> 23 OR
         v_structure <> 2 OR v_content <> 1) THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'database version must be exactly 23.02.001';
     END IF;
 
-    IF NOT v_is_current THEN
+    IF NOT v_is_current AND NOT v_is_superseded THEN
         DROP TABLE IF EXISTS `warden_action`;
     END IF;
 
@@ -54,9 +60,9 @@ main: BEGIN
             SET MESSAGE_TEXT = 'legacy warden_action removal postcondition failed';
     END IF;
 
-    IF v_is_current THEN
+    IF v_is_current OR v_is_superseded THEN
         SELECT '* UPDATE SKIPPED *' AS `Status`,
-               '23.03.001 is already current and validated' AS `Detail`;
+               '23.03.001 postcondition is already satisfied' AS `Detail`;
         LEAVE main;
     END IF;
 

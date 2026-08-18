@@ -37,6 +37,13 @@ DUMP = (ROOT / "Tools" / "dump_tables.sh").read_text(encoding="utf-8")
 WARDEN_UPDATE = (
     ROOT / "World" / "Updates" / "Rel23" / "Rel23_04_001_Warden_Checks.sql"
 ).read_text(encoding="utf-8")
+CHARACTER_WARDEN_UPDATE = (
+    ROOT
+    / "Character"
+    / "Updates"
+    / "Rel23"
+    / "Rel23_03_001_Remove_Warden_Action.sql"
+).read_text(encoding="utf-8")
 
 
 def shell_function(name: str) -> str:
@@ -112,6 +119,64 @@ def bash_executable() -> str:
 
 
 class CharacterUpdateRoutingTests(unittest.TestCase):
+    def run_update_failure(
+        self, failed_database: str, populate_old_world: bool = False
+    ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary_path = Path(temporary)
+            releases = re.findall(r'(?m)^(?:OLDRELEASE|RELEASE)="([^"]+)"$', INSTALL)
+            self.assertEqual(len(releases), 2)
+            for database in ("Character", "World", "Realm"):
+                for release in releases:
+                    update_directory = temporary_path / database / "Updates" / release
+                    update_directory.mkdir(parents=True, exist_ok=True)
+                    if (
+                        database == "World"
+                        and release == releases[0]
+                        and not populate_old_world
+                    ):
+                        continue
+                    (update_directory / "fixture.sql").write_text(
+                        "-- controlled update fixture\n", encoding="utf-8"
+                    )
+            world_calls = 1 + int(populate_old_world)
+            fail_call = len(releases) + world_calls
+            if failed_database == "realm_test":
+                fail_call += 1
+            command_log = temporary_path / "dbcommand.log"
+            fake_mariadb = temporary_path / "mariadb"
+            fake_mariadb.write_text(
+                "#!/bin/sh\n"
+                "database=\n"
+                "for argument do database=${argument}; done\n"
+                "count_file=${WARDEN_DB_COMMAND_LOG}.count\n"
+                "count=0\n"
+                "if [ -f \"${count_file}\" ]; then read count < \"${count_file}\"; fi\n"
+                "count=$((count + 1))\n"
+                "printf '%s\\n' \"${database}\" >> \"${WARDEN_DB_COMMAND_LOG}\"\n"
+                "printf '%s\\n' \"${count}\" > \"${count_file}\"\n"
+                f"if [ \"${{count}}\" -eq {fail_call} ]; then\n"
+                "    exit 73\n"
+                "fi\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            fake_mariadb.chmod(0o755)
+            environment = os.environ.copy()
+            environment["PATH"] = str(temporary_path) + os.pathsep + environment["PATH"]
+            environment["WARDEN_DB_COMMAND_LOG"] = str(command_log)
+            result = subprocess.run(
+                [bash_executable(), str(ROOT / "InstallDatabases.sh"), "-su"],
+                cwd=temporary_path,
+                input="host\nuser\n3306\npass\ncharacter_test\nworld_test\nrealm_test\n",
+                capture_output=True,
+                check=False,
+                text=True,
+                env=environment,
+            )
+            commands = command_log.read_text(encoding="utf-8").splitlines()
+        return result, commands
+
     def test_character_updates_are_dispatched_from_the_top_level(self) -> None:
         execution = INSTALL[INSTALL.index('if [ "${createcharDB}" = "YES" ]') :]
         self.assertRegex(
@@ -168,6 +233,35 @@ class CharacterUpdateRoutingTests(unittest.TestCase):
                 command_log.read_text(encoding="utf-8").splitlines(),
                 ["character_test"],
             )
+
+    def test_world_update_failure_stops_realm_and_success_dispatch(self) -> None:
+        result, commands = self.run_update_failure(
+            "world_test", populate_old_world=True
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("World database update failed.", result.stdout)
+        self.assertNotIn("Database creation and load complete :-)", result.stdout)
+        self.assertEqual(commands.count("world_test"), 2)
+        self.assertNotIn("realm_test", commands)
+
+    def test_empty_old_world_release_reaches_current_update(self) -> None:
+        result, commands = self.run_update_failure("realm_test")
+        releases = re.findall(r'(?m)^(?:OLDRELEASE|RELEASE)="([^"]+)"$', INSTALL)
+
+        self.assertIn(
+            f"Applying update World/Updates/{releases[1]}/fixture.sql",
+            result.stdout,
+        )
+        self.assertEqual(commands.count("world_test"), 1)
+
+    def test_realm_update_failure_stops_success_dispatch(self) -> None:
+        result, commands = self.run_update_failure("realm_test")
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Realm database update failed.", result.stdout)
+        self.assertNotIn("Database creation and load complete :-)", result.stdout)
+        self.assertEqual(commands.count("realm_test"), 1)
 
 
 class WardenBackupRoutingTests(unittest.TestCase):
@@ -734,6 +828,43 @@ class WardenBackupRoutingTests(unittest.TestCase):
 
 
 class WardenSchemaPostconditionTests(unittest.TestCase):
+    def test_superseded_character_update_validates_then_skips(self) -> None:
+        update = CHARACTER_WARDEN_UPDATE
+        self.assertIn("DECLARE v_is_superseded BOOL DEFAULT FALSE;", update)
+        self.assertIn("SET v_is_superseded = COALESCE(", update)
+        guard = update.index("IF NOT v_is_current")
+        validation = update.index("SELECT COUNT(*) INTO v_table_count", guard)
+        skip = update.index("IF v_is_current OR v_is_superseded THEN", validation)
+        version_insert = update.index("INSERT INTO `db_version`", skip)
+        self.assertLess(guard, validation)
+        self.assertLess(validation, skip)
+        self.assertLess(skip, version_insert)
+        self.assertIn(
+            "'23.03.001 postcondition is already satisfied'",
+            update[skip:version_insert],
+        )
+
+    def test_world_current_is_exact_but_superseded_is_compatibility_only(self) -> None:
+        superseded = WARDEN_UPDATE.index("IF v_is_superseded THEN")
+        superseded_leave = WARDEN_UPDATE.index("LEAVE main;", superseded)
+        compatibility = WARDEN_UPDATE[superseded:superseded_leave]
+        exact = WARDEN_UPDATE[superseded_leave:]
+
+        self.assertIn("`table_name` = 'warden_checks'", compatibility)
+        self.assertIn("`table_name` = 'warden'", compatibility)
+        self.assertNotIn("`information_schema`.`columns`", compatibility)
+        self.assertNotIn("`information_schema`.`statistics`", compatibility)
+        self.assertNotIn("v_row_count", compatibility)
+
+        exact_validation = exact.index("SELECT COUNT(*) INTO v_table_count")
+        current_skip = exact.index("IF v_is_current THEN", exact_validation)
+        version_insert = exact.index("INSERT INTO `db_version`", current_skip)
+        self.assertLess(exact_validation, current_skip)
+        self.assertLess(current_skip, version_insert)
+        self.assertIn("v_column_count <> 14", exact[:current_skip])
+        self.assertIn("v_index_count <> 8", exact[:current_skip])
+        self.assertIn("v_row_count <> 0", exact[:current_skip])
+
     def test_validates_exact_columns_and_required_indexes(self) -> None:
         validation = WARDEN_UPDATE[
             WARDEN_UPDATE.index("SELECT COUNT(*) INTO v_table_count") :
