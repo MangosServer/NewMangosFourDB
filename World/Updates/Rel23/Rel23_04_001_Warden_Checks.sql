@@ -17,6 +17,9 @@ main: BEGIN
     DECLARE v_is_current BOOL DEFAULT FALSE;
     DECLARE v_table_count INT DEFAULT 0;
     DECLARE v_column_count INT DEFAULT 0;
+    DECLARE v_column_match_count INT DEFAULT 0;
+    DECLARE v_index_count INT DEFAULT 0;
+    DECLARE v_index_match_count INT DEFAULT 0;
     DECLARE v_row_count BIGINT DEFAULT 0;
     DECLARE v_sql_message TEXT DEFAULT NULL;
 
@@ -75,13 +78,107 @@ main: BEGIN
      WHERE `table_schema` = DATABASE()
        AND `table_name` = 'warden_checks'
        AND UPPER(`engine`) = 'INNODB'
-       AND UPPER(`row_format`) = 'DYNAMIC';
-    SELECT COUNT(*) INTO v_column_count
+       AND UPPER(`row_format`) = 'DYNAMIC'
+       AND LOWER(`table_collation`) LIKE 'utf8%';
+    SELECT COUNT(*),
+           COALESCE(SUM(CASE
+             WHEN `ordinal_position` = 1 AND `column_name` = 'build'
+               AND `data_type` = 'smallint'
+               AND LOCATE('unsigned', LOWER(`column_type`)) > 0
+               AND `is_nullable` = 'NO' AND `column_default` IS NULL THEN 1
+             WHEN `ordinal_position` = 2 AND `column_name` = 'platform'
+               AND `data_type` = 'varbinary'
+               AND `character_maximum_length` = 4
+               AND `is_nullable` = 'NO' AND `column_default` IS NULL THEN 1
+             WHEN `ordinal_position` = 3 AND `column_name` = 'locale'
+               AND `data_type` = 'binary'
+               AND `character_maximum_length` = 4
+               AND `is_nullable` = 'NO' AND `column_default` IS NULL THEN 1
+             WHEN `ordinal_position` = 4 AND `column_name` = 'check_id'
+               AND `data_type` = 'int'
+               AND LOCATE('unsigned', LOWER(`column_type`)) > 0
+               AND `is_nullable` = 'NO' AND `column_default` IS NULL THEN 1
+             WHEN `ordinal_position` = 5 AND `column_name` = 'type'
+               AND `data_type` = 'tinyint'
+               AND LOCATE('unsigned', LOWER(`column_type`)) > 0
+               AND `is_nullable` = 'NO' AND `column_default` IS NULL THEN 1
+             WHEN `ordinal_position` = 6 AND `column_name` = 'enabled'
+               AND `data_type` = 'tinyint'
+               AND LOCATE('unsigned', LOWER(`column_type`)) > 0
+               AND `is_nullable` = 'NO' AND `column_default` IS NULL THEN 1
+             WHEN `ordinal_position` = 7 AND `column_name` = 'sort_order'
+               AND `data_type` = 'smallint'
+               AND LOCATE('unsigned', LOWER(`column_type`)) > 0
+               AND `is_nullable` = 'NO' AND `column_default` IS NULL THEN 1
+             WHEN `ordinal_position` = 8 AND `column_name` = 'evidence_class'
+               AND `data_type` = 'tinyint'
+               AND LOCATE('unsigned', LOWER(`column_type`)) > 0
+               AND `is_nullable` = 'NO' AND `column_default` IS NULL THEN 1
+             WHEN `ordinal_position` = 9 AND `column_name` = 'module'
+               AND `data_type` = 'varbinary'
+               AND `character_maximum_length` = 255
+               AND `is_nullable` = 'NO' AND `column_default` IS NOT NULL
+               AND REPLACE(CAST(`column_default` AS CHAR), '''', '') = '' THEN 1
+             WHEN `ordinal_position` = 10 AND `column_name` = 'address'
+               AND `data_type` = 'int'
+               AND LOCATE('unsigned', LOWER(`column_type`)) > 0
+               AND `is_nullable` = 'NO'
+               AND REPLACE(CAST(`column_default` AS CHAR), '''', '') = '0' THEN 1
+             WHEN `ordinal_position` = 11 AND `column_name` = 'length'
+               AND `data_type` = 'smallint'
+               AND LOCATE('unsigned', LOWER(`column_type`)) > 0
+               AND `is_nullable` = 'NO'
+               AND REPLACE(CAST(`column_default` AS CHAR), '''', '') = '0' THEN 1
+             WHEN `ordinal_position` = 12 AND `column_name` = 'request'
+               AND `data_type` = 'varbinary'
+               AND `character_maximum_length` = 255
+               AND `is_nullable` = 'NO' AND `column_default` IS NOT NULL
+               AND REPLACE(CAST(`column_default` AS CHAR), '''', '') = '' THEN 1
+             WHEN `ordinal_position` = 13 AND `column_name` = 'expected'
+               AND `data_type` = 'varbinary'
+               AND `character_maximum_length` = 255
+               AND `is_nullable` = 'NO' AND `column_default` IS NOT NULL
+               AND REPLACE(CAST(`column_default` AS CHAR), '''', '') = '' THEN 1
+             WHEN `ordinal_position` = 14 AND `column_name` = 'comment'
+               AND `data_type` = 'varchar'
+               AND `character_maximum_length` = 255
+               AND `is_nullable` = 'NO' AND `column_default` IS NOT NULL
+               AND REPLACE(CAST(`column_default` AS CHAR), '''', '') = '' THEN 1
+             ELSE 0 END), 0)
+      INTO v_column_count, v_column_match_count
       FROM `information_schema`.`columns`
      WHERE `table_schema` = DATABASE()
        AND `table_name` = 'warden_checks';
+    SELECT COUNT(*),
+           COALESCE(SUM(CASE
+             WHEN `index_name` = 'PRIMARY' AND `seq_in_index` = 1
+               AND `column_name` = 'build' THEN 1
+             WHEN `index_name` = 'PRIMARY' AND `seq_in_index` = 2
+               AND `column_name` = 'platform' THEN 1
+             WHEN `index_name` = 'PRIMARY' AND `seq_in_index` = 3
+               AND `column_name` = 'locale' THEN 1
+             WHEN `index_name` = 'PRIMARY' AND `seq_in_index` = 4
+               AND `column_name` = 'check_id' THEN 1
+             WHEN `index_name` = 'uq_warden_checks_profile_order'
+               AND `seq_in_index` = 1 AND `column_name` = 'build' THEN 1
+             WHEN `index_name` = 'uq_warden_checks_profile_order'
+               AND `seq_in_index` = 2 AND `column_name` = 'platform' THEN 1
+             WHEN `index_name` = 'uq_warden_checks_profile_order'
+               AND `seq_in_index` = 3 AND `column_name` = 'locale' THEN 1
+             WHEN `index_name` = 'uq_warden_checks_profile_order'
+               AND `seq_in_index` = 4 AND `column_name` = 'sort_order' THEN 1
+             ELSE 0 END), 0)
+      INTO v_index_count, v_index_match_count
+      FROM `information_schema`.`statistics`
+     WHERE `table_schema` = DATABASE()
+       AND `table_name` = 'warden_checks'
+       AND `index_name` IN ('PRIMARY', 'uq_warden_checks_profile_order')
+       AND `non_unique` = 0
+       AND `sub_part` IS NULL;
 
-    IF v_table_count <> 1 OR v_column_count <> 14 THEN
+    IF v_table_count <> 1
+       OR v_column_count <> 14 OR v_column_match_count <> 14
+       OR v_index_count <> 8 OR v_index_match_count <> 8 THEN
         SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'typed warden_checks structure postcondition failed';
     END IF;

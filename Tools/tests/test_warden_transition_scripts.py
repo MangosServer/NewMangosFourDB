@@ -23,6 +23,8 @@
 
 from pathlib import Path
 import re
+import shutil
+import subprocess
 import unittest
 
 
@@ -30,6 +32,9 @@ ROOT = Path(__file__).resolve().parents[2]
 INSTALL = (ROOT / "InstallDatabases.sh").read_text(encoding="utf-8")
 BACKUP = (ROOT / "Tools" / "backupDB.cmd").read_text(encoding="utf-8")
 DUMP = (ROOT / "Tools" / "dump_tables.sh").read_text(encoding="utf-8")
+WARDEN_UPDATE = (
+    ROOT / "World" / "Updates" / "Rel23" / "Rel23_04_001_Warden_Checks.sql"
+).read_text(encoding="utf-8")
 
 
 def shell_function(name: str) -> str:
@@ -50,6 +55,18 @@ def batch_label(name: str, next_label: str) -> str:
     if not match:
         raise AssertionError(f"missing batch label {name}")
     return match.group(1)
+
+
+def bash_executable() -> str:
+    bash = shutil.which("bash")
+    if bash:
+        return bash
+    git = shutil.which("git")
+    if git:
+        candidate = Path(git).resolve().parents[1] / "bin" / "bash.exe"
+        if candidate.is_file():
+            return str(candidate)
+    raise AssertionError("bash is required to validate dump_tables.sh")
 
 
 class CharacterUpdateRoutingTests(unittest.TestCase):
@@ -102,6 +119,14 @@ class WardenBackupRoutingTests(unittest.TestCase):
             len(self.EXPECTED_OPTIONAL_TABLES),
         )
 
+    def test_script_returns_failure_to_automation(self) -> None:
+        self.assertIn('set "BACKUPRESULT=0"', BACKUP)
+        self.assertEqual(BACKUP.count('set "BACKUPRESULT=1"'), 2)
+        self.assertRegex(
+            BACKUP,
+            r"(?ms)^:finish\s*$\s*pause\s*exit /b %BACKUPRESULT%\s*$",
+        )
+
     def test_absence_removes_only_the_exact_stale_output_after_probe(self) -> None:
         helper = batch_label("DumpOptionalTable", "patherror")
         validated = helper.index('if not "%OPTIONALFOUND%" == "0" if not ')
@@ -117,6 +142,12 @@ class WardenBackupRoutingTests(unittest.TestCase):
             ),
             1,
         )
+        absent_branch = helper[absent : helper.index('set "OPTIONALPARAMS="')]
+        self.assertRegex(
+            absent_branch,
+            r'(?s)del /Q "%OPTIONALOUTPUT%"\s*'
+            r'if exist "%OPTIONALOUTPUT%" \(.*?exit /b 1',
+        )
         self.assertNotRegex(helper, r'del /Q "[^"\r\n]*\*[^"\r\n]*"')
 
     def test_present_table_output_is_published_only_after_complete_dump(self) -> None:
@@ -130,7 +161,33 @@ class WardenBackupRoutingTests(unittest.TestCase):
         self.assertLess(ready, publish)
         self.assertNotIn('>> "%OPTIONALOUTPUT%"', helper)
 
-    def test_unix_dump_selects_existing_warden_tables_and_cleans_stale_files(
+    def test_data_only_assembly_failure_preserves_previous_output(self) -> None:
+        helper = batch_label("DumpOptionalTable", "patherror")
+        assembly = helper[
+            helper.index('if /I "%OPTIONALSTRUCTURE%" == "NO" (') :
+            helper.index('move /Y "%OPTIONALREADY%" "%OPTIONALOUTPUT%"')
+        ]
+        writes = [
+            '%ComSpec% /D /C echo -- ---------------------------------------- ^> "%OPTIONALREADY%"',
+            '%ComSpec% /D /C echo -- --        CLEAR DOWN THE TABLE        -- ^>^> "%OPTIONALREADY%"',
+            '%ComSpec% /D /C echo -- ---------------------------------------- ^>^> "%OPTIONALREADY%"',
+            '%ComSpec% /D /C echo TRUNCATE TABLE `%OPTIONALTABLE%`; ^>^> "%OPTIONALREADY%"',
+            '%ComSpec% /D /C type "%OPTIONALTEMP%" ^>^> "%OPTIONALREADY%"',
+        ]
+        for write in writes:
+            self.assertRegex(
+                assembly,
+                re.escape(write)
+                + r"\s*if errorlevel 1 goto DumpOptionalTableAssemblyFailed",
+            )
+        self.assertRegex(
+            assembly,
+            r'(?s)del /Q "%OPTIONALTEMP%"\s*'
+            r'if exist "%OPTIONALTEMP%" goto DumpOptionalTableAssemblyFailed',
+        )
+        self.assertIn(":DumpOptionalTableAssemblyFailed", BACKUP)
+
+    def test_unix_dump_replaces_warden_files_only_after_staging(
         self,
     ) -> None:
         candidates = re.search(r"for WARDEN_TABLE in ([^;\n]+); do", DUMP)
@@ -139,14 +196,85 @@ class WardenBackupRoutingTests(unittest.TestCase):
         self.assertRegex(
             DUMP,
             r"(?s)for WARDEN_TABLE in warden warden_checks; do.*?"
-            r"mysqldump .*--no-data.*\$\{DB\}.*\$\{WARDEN_TABLE\}",
+            r"WARDEN_FOUND=.*?mysql .*information_schema\.tables",
         )
-        self.assertIn(
+        self.assertIn('case "${WARDEN_FOUND}" in', DUMP)
+        self.assertIn('> "${WARDEN_READY}"', DUMP)
+        stage = DUMP.index('> "${WARDEN_READY}"')
+        publish = DUMP.index(
+            'mv -f "${WARDEN_READY}" "${DUMPDIR}/${WARDEN_TABLE}.sql"'
+        )
+        stale_cleanup = DUMP.index(
+            'rm -f "${DUMPDIR}/${WARDEN_TABLE}.sql"', publish
+        )
+        self.assertLess(stage, publish)
+        self.assertLess(publish, stale_cleanup)
+        self.assertIn('if ! mysqldump ', DUMP)
+        self.assertIn('if ! mv -f "${WARDEN_READY}"', DUMP)
+        self.assertNotIn(
             'rm -f "${DUMPDIR}/warden.sql" "${DUMPDIR}/warden_checks.sql"',
             DUMP,
         )
-        self.assertIn("${WARDEN_TABLES} \\", DUMP)
+        self.assertNotIn("${WARDEN_TABLES} \\", DUMP)
+        self.assertRegex(
+            DUMP,
+            r"(?ms)^dump_warden_tables\(\)\s*\{.*?^\}\s*$",
+        )
         self.assertNotRegex(DUMP, r"(?m)^`warden(?:_checks)?` \\$")
+
+    def test_complete_unix_dump_script_parses_and_iterates_tables(self) -> None:
+        result = subprocess.run(
+            [bash_executable(), "-n", str(ROOT / "Tools" / "dump_tables.sh")],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        loop = re.search(r"(?ms)^for TABLE in [\\]\r?\n.*?^; do\s*$", DUMP)
+        self.assertIsNotNone(loop, "generic table loop is missing")
+        iteration = subprocess.run(
+            [bash_executable(), "-c", loop.group(0) + '\nprintf "%s\\n" "$TABLE"\ndone\n'],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        self.assertEqual(iteration.returncode, 0, iteration.stderr)
+        self.assertGreater(len(iteration.stdout.splitlines()), 100)
+
+
+class WardenSchemaPostconditionTests(unittest.TestCase):
+    def test_validates_exact_columns_and_required_indexes(self) -> None:
+        validation = WARDEN_UPDATE[
+            WARDEN_UPDATE.index("SELECT COUNT(*) INTO v_table_count") :
+        ]
+        for column in (
+            "build",
+            "platform",
+            "locale",
+            "check_id",
+            "type",
+            "enabled",
+            "sort_order",
+            "evidence_class",
+            "module",
+            "address",
+            "length",
+            "request",
+            "expected",
+            "comment",
+        ):
+            self.assertIn(f"`column_name` = '{column}'", validation)
+        self.assertIn("`information_schema`.`statistics`", validation)
+        self.assertIn("`index_name` = 'PRIMARY'", validation)
+        self.assertIn(
+            "`index_name` = 'uq_warden_checks_profile_order'", validation
+        )
+        self.assertIn("`data_type` = 'varbinary'", validation)
+        self.assertIn("`character_maximum_length` = 255", validation)
+        self.assertIn("LOCATE('unsigned', LOWER(`column_type`)) > 0", validation)
+        self.assertIn("v_column_match_count <> 14", validation)
+        self.assertIn("v_index_match_count <> 8", validation)
 
 
 if __name__ == "__main__":
